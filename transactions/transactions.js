@@ -5,9 +5,9 @@ var fs = require("fs");
 var crypto = require("crypto");
 var openpgp = require("openpgp");
 
-const KEYS_DIR = path.join(__dirname,"keys");
-const PRIV_KEY_TEXT = fs.readFileSync(path.join(KEYS_DIR,"priv.pgp.key"),"utf8");
-const PUB_KEY_TEXT = fs.readFileSync(path.join(KEYS_DIR,"pub.pgp.key"),"utf8");
+const KEYS_DIR = path.join(__dirname, "keys");
+const PRIV_KEY_TEXT = fs.readFileSync(path.join(KEYS_DIR, "priv.pgp.key"), "utf8");
+const PUB_KEY_TEXT = fs.readFileSync(path.join(KEYS_DIR, "pub.pgp.key"), "utf8");
 
 // The Power of a Smile
 // by Tupac Shakur
@@ -35,18 +35,35 @@ Blockchain.blocks.push({
 });
 
 addPoem()
-.then(checkPoem)
-.catch(console.log);
+	.then(checkPoem)
+	.catch(console.log);
 
 
 // **********************************
+function createTransaction(line) {
+
+	let tx = {
+		data: line
+	}
+	tx.hash = transactionHash(tx);
+	return tx;
+}
+
+async function authorizeTransaction(tx) {
+	tx.pubKey = PUB_KEY_TEXT;
+	tx.signature = await createSignature(tx.hash, PRIV_KEY_TEXT);
+	return tx;
+}
 
 async function addPoem() {
 	var transactions = [];
 
 	// TODO: add poem lines as authorized transactions
-	// for (let line of poem) {
-	// }
+	for (let line of poem) {
+		let tranObj = createTransaction(line);
+		tranObj = await authorizeTransaction(tranObj);
+		transactions.push(tranObj);
+	}
 
 	var bl = createBlock(transactions);
 
@@ -62,7 +79,7 @@ async function checkPoem(chain) {
 function createBlock(data) {
 	var bl = {
 		index: Blockchain.blocks.length,
-		prevHash: Blockchain.blocks[Blockchain.blocks.length-1].hash,
+		prevHash: Blockchain.blocks[Blockchain.blocks.length - 1].hash,
 		data,
 		timestamp: Date.now(),
 	};
@@ -78,7 +95,7 @@ function transactionHash(tr) {
 	).digest("hex");
 }
 
-async function createSignature(text,privKey) {
+async function createSignature(text, privKey) {
 	var privKeyObj = openpgp.key.readArmored(privKey).keys[0];
 
 	var options = {
@@ -89,7 +106,7 @@ async function createSignature(text,privKey) {
 	return (await openpgp.sign(options)).data;
 }
 
-async function verifySignature(signature,pubKey) {
+async function verifySignature(signature, pubKey) {
 	try {
 		let pubKeyObj = openpgp.key.readArmored(pubKey).keys[0];
 
@@ -100,7 +117,7 @@ async function verifySignature(signature,pubKey) {
 
 		return (await openpgp.verify(options)).signatures[0].valid;
 	}
-	catch (err) {}
+	catch (err) { }
 
 	return false;
 }
@@ -109,6 +126,16 @@ function blockHash(bl) {
 	return crypto.createHash("sha256").update(
 		`${bl.index};${bl.prevHash};${JSON.stringify(bl.data)};${bl.timestamp}`
 	).digest("hex");
+}
+
+async function verifyTransaction(tx) {
+
+	//if(tx.hash !== transactionHash(tx)) return false;
+	console.log("!", tx);
+	if (tx.data == null) return false;
+	if (typeof tx.pubKey != "string") return false;
+	if (typeof tx.signature != "string") return false;
+	return verifySignature(tx.signature, tx.pubKey)
 }
 
 async function verifyBlock(bl) {
@@ -129,6 +156,9 @@ async function verifyBlock(bl) {
 		if (!Array.isArray(bl.data)) return false;
 
 		// TODO: verify transactions in block
+		for (let tr of bl.data) {
+			if (!(await verifyTransaction(tr))) return false;
+		}
 	}
 
 	return true;
