@@ -130,9 +130,7 @@ function blockHash(bl) {
 
 async function verifyTransaction(tx) {
 
-	//if(tx.hash !== transactionHash(tx)) return false;
-	console.log("!", tx);
-	if (tx.data == null) return false;
+	if (tx.hash !== transactionHash(tx)) return false;
 	if (typeof tx.pubKey != "string") return false;
 	if (typeof tx.signature != "string") return false;
 	return verifySignature(tx.signature, tx.pubKey)
